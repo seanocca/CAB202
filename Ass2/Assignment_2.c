@@ -17,15 +17,13 @@
 #include "collision.h"
 #include "initiliaze.h"
 #include "movement.h"
-#include "spritecreate.h"
+//#include "spritecreate.h"
 
 #define FREQ (8000000.0)
 #define PRESCALE (1024.0)
 #define THRESHOLD (1000)
 
 void serial_outputs(void);
-
-
 
 int flr = 0, score = 0, boolKey = 0, 
 	pausing = 0, gameOver = 0, gameStart = 0, cDown = 11, cDownOut = 3,

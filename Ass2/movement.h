@@ -1,6 +1,7 @@
 #include <macros.h>
 #include <sprite.c>
 #include <sprite.h>
+#include "spritecreate.h"
 
 
 void move_player(void){

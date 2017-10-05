@@ -1,8 +1,7 @@
 #include <macros.h>
-#include <sprite.c>
-#include <sprite.h>
 #include "spritecreate.h"
 
+int lives = 3;
 
 void move_player(void){
 	player.is_visible = 1;
@@ -87,7 +86,6 @@ void move_player(void){
 }
 
 void enemy_crawl(void){
-	int play_x = player.x, play_y = player.y;
 
 	if (sprite_collision(player, enemy) == 1){
 		lives--;
@@ -97,16 +95,16 @@ void enemy_crawl(void){
 
 	if (enemy.x <= 83 && enemy.x >= 0){
 		if (enemy.y <= 47 && enemy.y >= 0){
-			if (enemy.x < play_x){
+			if (enemy.x < player.x){
 				enemy.x += 0.1;
 			} 
-			if (enemy.x > play_x){
+			if (enemy.x > player.x){
 				enemy.x -= 0.1;
 			}
-			if (enemy.y < play_y){
+			if (enemy.y < player.y){
 				enemy.y += 0.1;
 			}
-			if (enemy.y > play_y){
+			if (enemy.y > player.y){
 				enemy.y -= 0.1;
 			}
 		}

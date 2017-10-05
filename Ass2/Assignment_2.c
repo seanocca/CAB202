@@ -15,6 +15,7 @@
 #include "lcd_model.h"
 #include "char.h"
 #include "collision.h"
+#include "initiliaze.h"
 
 #define FREQ (8000000.0)
 #define PRESCALE (1024.0)
@@ -235,25 +236,7 @@ void setup(void){
 	serial_USB();
 
 	//INITIALIZE JOYSTICK, SWITCHES, POMETERS AND LEDS
-	CLEAR_BIT(DDRD, 1); //Up
-	CLEAR_BIT(DDRB, 7); //Down
-	CLEAR_BIT(DDRB, 1); //Right
-	CLEAR_BIT(DDRD, 0); //Left
-	CLEAR_BIT(DDRB, 0); //Centre
-
-	CLEAR_BIT(DDRF, 5); //Left Swicth
-	CLEAR_BIT(DDRF, 6); //RIght Switch
-
-	CLEAR_BIT(DDRF, 0); //Left Pometer
-	CLEAR_BIT(DDRF, 1); //Right Pometer
-
-	SET_BIT(DDRB, 2); //Left LED
-	SET_BIT(DDRB, 3); //Right LED	
-	SET_BIT(DDRD, 6); //Teensy LED
-
-	TCCR0A = 0;
-	TCCR0B = 5;
-	TIMSK0 = 1;
+	init_teensy();
 
 	flr = 0; 
 	score = 0; 

@@ -19,21 +19,21 @@ int sprite_collision(Sprite collide, Sprite object){
 	return 0;	
 }
 
-int wall_collision_movement(void){
-	if (player.x < 3){
-		player.x++;
+int wall_collision_movement(Sprite hero){
+	if (hero.x < 3){
+		hero.x++;
 		return 1;
 	}
-	if (player.x + player.width >= LCD_X - 4){
-		player.x--;
+	if (hero.x + hero.width >= LCD_X - 4){
+		hero.x--;
 		return 1;
 	} 
-	if(player.y < 3){
-		player.y++;
+	if(hero.y < 3){
+		hero.y++;
 		return 1;
 	} 
-	if(player.y + player.height >= LCD_Y - 2){
-		player.y--;
+	if(hero.y + hero.height >= LCD_Y - 2){
+		hero.y--;
 		return 1;
 	} 
 	return 0;

@@ -382,7 +382,7 @@ void move_player(void){
 			door.y++;
 			enemy.y++;
 		} else {
-			if (wall_collision_movement() == 0){
+			if (wall_collision_movement(player) == 0){
 				player.y--;
 			}
 		}
@@ -400,7 +400,7 @@ void move_player(void){
 			door.y--;
 			enemy.y--;
 		} else{
-			if (wall_collision_movement() == 0){
+			if (wall_collision_movement(player) == 0){
 				player.y++;
 			}
 		}
@@ -417,7 +417,7 @@ void move_player(void){
 			door.x++;
 			enemy.x++;
 		} else {
-			if (wall_collision_movement() == 0){
+			if (wall_collision_movement(player) == 0){
 				player.x--;
 			}
 		}
@@ -435,7 +435,7 @@ void move_player(void){
 			door.x--;
 			enemy.x--;
 		} else {
-			if (wall_collision_movement() == 0){
+			if (wall_collision_movement(player) == 0){
 				player.x++;
 			}
 		}

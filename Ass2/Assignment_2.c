@@ -27,7 +27,7 @@ void serial_outputs(void);
 
 
 
-int flr = 0, score = 0, lives = 3, boolKey = 0, 
+int flr = 0, score = 0, boolKey = 0, 
 	pausing = 0, gameOver = 0, gameStart = 0, cDown = 11, cDownOut = 3,
 	received = 0, loading = 0;
 
@@ -49,8 +49,6 @@ char *studentNum = "n10000569";
 char *readyCount = "Ready?";
 
 char *keyCollect = "[%d] Player found the Key";
-
-void draw_in_border(void);
 
 void serial_USB(void){
 	//Allow interruptions

@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <sprite.c>
-#include <sprite.h>
 #include "char.h"
 
 Sprite player;

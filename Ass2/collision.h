@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <sprite.c>
-#include <sprite.h>
-
 int sprite_collision(Sprite collide, Sprite object){
 	int coll_left = collide.x;
 	int coll_right = collide.x + collide.width;

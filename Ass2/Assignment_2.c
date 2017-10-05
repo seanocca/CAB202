@@ -160,7 +160,7 @@ void setup(void){
 
 	sei();
 
-	serial_USB();
+	//serial_USB();
 
 	//INITIALIZE JOYSTICK, SWITCHES, POMETERS AND LEDS
 	init_teensy();

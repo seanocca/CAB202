@@ -17,7 +17,6 @@
 #include "collision.h"
 #include "initiliaze.h"
 #include "movement.h"
-//#include "spritecreate.h"
 
 #define FREQ (8000000.0)
 #define PRESCALE (1024.0)

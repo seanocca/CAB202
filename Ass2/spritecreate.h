@@ -12,27 +12,11 @@ Sprite right;
 Sprite top;
 Sprite bottom;
 
-void draw_in_border(void){
-	for (int h = 0; h < 48; h++){
-		set_pixel(0,h,FG_COLOUR);
-		set_pixel(1,h,FG_COLOUR);
-		set_pixel(83,h, FG_COLOUR);
-		set_pixel(82,h,FG_COLOUR);
-	}
-	for (int w = 0; w < 84; w++){
-		set_pixel(w,0,FG_COLOUR);
-		set_pixel(w,1,FG_COLOUR);
-		set_pixel(w,47, FG_COLOUR);
-		set_pixel(w,46,FG_COLOUR);
-	}
-}
-
 void create_scroll_border(void){
 	sprite_init(&left,-21,-12,VERWIDTH,VERHEIGHT,verBitmaps);
 	sprite_init(&right,105 - VERWIDTH,-12,VERWIDTH,VERHEIGHT,verBitmaps);
 	sprite_init(&top,-21,-12,HORWIDTH, HORHEIGHT,horBitmaps);
 	sprite_init(&bottom,-21,60,HORWIDTH,HORHEIGHT,horBitmaps);
-
 }
 
 void draw_scroll_border(void){
@@ -73,5 +57,20 @@ void draw_level(int lvl){
 		sprite_draw(&door);
 		sprite_draw(&enemy);
 		sprite_draw(&key);
+	}
+}
+
+void draw_in_border(void){
+	for (int h = 0; h < 48; h++){
+		set_pixel(0,h,FG_COLOUR);
+		set_pixel(1,h,FG_COLOUR);
+		set_pixel(83,h, FG_COLOUR);
+		set_pixel(82,h,FG_COLOUR);
+	}
+	for (int w = 0; w < 84; w++){
+		set_pixel(w,0,FG_COLOUR);
+		set_pixel(w,1,FG_COLOUR);
+		set_pixel(w,47, FG_COLOUR);
+		set_pixel(w,46,FG_COLOUR);
 	}
 }

@@ -17,6 +17,7 @@
 #include "collision.h"
 #include "initiliaze.h"
 #include "movement.h"
+#include "screens.h"
 
 #define FREQ (8000000.0)
 #define PRESCALE (1024.0)
@@ -24,9 +25,8 @@
 
 void serial_outputs(void);
 
-int flr = 0, score = 0, boolKey = 0, 
-	pausing = 0, gameOver = 0, gameStart = 0, cDown = 11, cDownOut = 3,
-	received = 0, loading = 0;
+int pausing = 0, gameOver = 0, gameStart = 0,
+	received = 0, flr, score, lives;
 
 double time = 0, min = 0;
  
@@ -34,18 +34,22 @@ volatile int oflow_counter = 0, gameTime = 0;
  
 char buffer[20];
 
-char *flr_msg = "Floor: %d";
-char *tim_msg = "Time: %02d:%02d";
-char *score_msg = "Score: %d";
-char *load_score_msg = "Score: %d";
-char *load_flr_msg = "Floor: %d";
-char *liv_msg = "Lives: %d";
-
-char *name = "Sean O'Connell";
-char *studentNum = "n10000569";
-char *readyCount = "Ready?";
-
 char *keyCollect = "[%d] Player found the Key";
+ 
+ISR(TIMER0_OVF_vect) {
+	if (gameStart == 1){
+	    oflow_counter ++;
+	    gameTime++;
+	    if (round(oflow_counter) == 1800){
+	    	oflow_counter = 0;
+	    	min++;
+	    }
+	}
+}
+
+void run_time(void){
+	time = ( oflow_counter * 256.0 + TCNT0 ) * PRESCALE  / FREQ;
+}
 
 void serial_USB(void){
 	//Allow interruptions
@@ -65,7 +69,7 @@ void serial_USB(void){
 	char *welcome = "The following is the output of the program:\r\n";
 	
 	while (!usb_configured() || !usb_serial_get_control()) {
-		// Block until USB is ready.	
+			// Block until USB is ready.	
 	}
 
 	usb_serial_write((uint8_t *) not_connect, strlen(not_connect));
@@ -81,72 +85,6 @@ void serial_USB(void){
 	_delay_ms(500);
 
 }
-
-void start_screen(void){
-	int countPos = 28;
-
-	clear_screen();
-
-	if(BIT_IS_SET(PINF,5) || BIT_IS_SET(PINF, 6)){
-		while (cDown > 0){
-			cDown--;
-
-			clear_screen();
-
-			if (cDown % 3 == 0){			
-				countPos = LCD_X/2;
-				sprintf(readyCount, "%d", cDownOut);
-				cDownOut--;
-				draw_string(countPos,LCD_Y / 4 * 3 + 2, readyCount, FG_COLOUR);
-			}
-
-			_delay_ms(100);
-
-			draw_in_border();
-
-			draw_string(17,2, "ANSI-TOWER", FG_COLOUR);
-			draw_string(8,LCD_Y / 4 + 2, name, FG_COLOUR);
-			draw_string(19,LCD_Y / 4 * 2 + 2, studentNum, FG_COLOUR);
-			draw_string(countPos,LCD_Y / 4 * 3 + 2, readyCount, FG_COLOUR);
-
-			show_screen();
-
-
-		}
-		gameStart = 1;
-	}
-
-	draw_in_border();
-
-	draw_string(17,2, "ANSI-TOWER", FG_COLOUR);
-	draw_string(8,LCD_Y / 4 + 2, name, FG_COLOUR);
-	draw_string(19,LCD_Y / 4 * 2 + 2, studentNum, FG_COLOUR);
-	draw_string(countPos,LCD_Y / 4 * 3 + 2, readyCount, FG_COLOUR);
-
-	show_screen();
-
-}
-
-
- 
-void draw_double(uint8_t x, uint8_t y, double seconds, double minutes, colour_t colour) {
-    snprintf(buffer, sizeof(buffer), "Time: %02.0f:%02.0f", minutes, seconds);
-    draw_string(x, y, buffer, colour);
-}
- 
-ISR(TIMER0_OVF_vect) {
-    oflow_counter ++;
-    gameTime++;
-    if (round(oflow_counter) == 1800){
-    	oflow_counter = 0;
-    	min++;
-    }
-}
-
-void run_time(void){
-	time = ( oflow_counter * 256.0 + TCNT0 ) * PRESCALE  / FREQ;
-}
-
 
 void setup(void){
 	//SET CLOCK SPEED
@@ -164,67 +102,17 @@ void setup(void){
 	//INITIALIZE JOYSTICK, SWITCHES, POMETERS AND LEDS
 	init_teensy();
 
-	flr = 0; 
-	score = 0; 
-	lives = 3; 
+	lives = 3;
 
 	boolKey = 0; 
 	pausing = 0; 
-	
-	time = 0;
-	min = 0;
-	
-	gameOver = 0; 
-	gameStart = 0;
+
+	flr = 0;
+	score = 0;
 
 	create_floor(flr);
 
-	cDownOut = 3;
-	cDown = 11;
-
 	serial_outputs();
-}
-
-int pause_status(void){
-	if (BIT_IS_SET(PINB, 0)){
-
-		sprintf(flr_msg, "Floor: %d", flr);
-		sprintf(score_msg, "Score: %d", score);
-		sprintf(liv_msg, "Lives: %d", lives);
-
-		clear_screen();
-
-		draw_in_border();
-
-		draw_string(15,2, "P A U S E D", FG_COLOUR);
-		draw_string(15, LCD_Y / 5 + 2, flr_msg, FG_COLOUR);
-		draw_double(15,LCD_Y / 5 * 2 + 2, time, min, FG_COLOUR);
-		draw_string(15,LCD_Y / 5 * 3 + 2, score_msg, FG_COLOUR);
-		draw_string(15,LCD_Y / 5 * 4 + 2, liv_msg, FG_COLOUR);
-
-		player.is_visible = 0;
-
-		show_screen();
-		return 1;
-	}
-
-	return 0;
-}
-
-void loading_screen(void){
-	clear_screen();
-
-	sprintf(load_score_msg, "Score: %d", score);
-	sprintf(load_flr_msg, "Floor: %d", flr);
-
-	draw_string(19, 3, "LOADING ...", FG_COLOUR);
-	draw_string(20, LCD_Y / 3 + 2, flr_msg, FG_COLOUR);
-	draw_string(20,LCD_Y / 3 * 2 + 2, score_msg, FG_COLOUR);
-
-	LCD_CMD(lcd_set_display_mode, lcd_display_inverse);
-	show_screen();
-
-	loading = 0;
 }
 
 void check_lvl_hits(void){
@@ -233,16 +121,26 @@ void check_lvl_hits(void){
 	}
 	if (sprite_collision(player, key) == 1){
 		boolKey = 1;
-		sprintf(keyCollect,"[%d] Player found the Key", gameTime);
-		usb_serial_write((uint8_t *) keyCollect, strlen(keyCollect));
 	}
-	if (sprite_collision(player,door) == 1 && boolKey == 1){		
+
+	if (sprite_collision(player, door) == 1 && boolKey == 1){
 		flr++;
-		score = score + 100;
-		boolKey = 0;
+		score += 100;
+		get_load_screen(score, flr);
+		create_floor(flr);
 		loading = 1;
-	} else if ((sprite_collision(player,door) == 1 && boolKey == 0) || (sprite_collision(player,tower))) {
-		player.y++;
+	}
+
+	if (flr == 0){
+		if ((sprite_collision(player,door) == 1 && boolKey == 0) || (sprite_collision(player,tower))) {
+			player.y++;
+		}
+	}
+	if (flr == 1){
+
+	}
+	if (flr >= 2){
+
 	}
 }
 
@@ -299,58 +197,48 @@ void process(void){
 	show_screen();
 }
 
-void game_over(void);
+void restart_game(void);
 
-int main(void){
+int main(void){	
 	setup();
 
-	serial_outputs();
+	//serial_outputs();
 
 	while(gameStart == 0){
 		start_screen();
 	}
 
-	while (gameOver == 0) {
+	while (gameOver == 0 && gameStart == 1) {
+		run_time();
 		if (loading == 0){
-			run_time();
-			if (pause_status() == 0){
+			if (pause_status(flr, score, lives, time, min) == 0){
 				process();
 				_delay_ms(10);
 			} else {
-				pause_status();
+				pause_status(flr, score, lives, time, min);
 			}
-			} else {
-			loading_screen();
+		} else {
+			show_load_screen();
 		}
 	}	
 
 	while(gameOver == 1){
-		game_over();
+		restart_game();
+		game_over(flr, lives, score);
 	}
 	return 0;
 }
 
-void game_over(void){
-
-	clear_screen();
-
-	sprintf(score_msg, "Score: %d", score);
-	sprintf(flr_msg, "Floor: %d", flr);
-	sprintf(liv_msg, "Lives: %d", lives);
-
-	draw_string(19, 3, "GAME OVER", FG_COLOUR);
-	draw_string(20, LCD_Y / 5 + 2, score_msg, FG_COLOUR);
-	draw_string(20,LCD_Y / 5 * 2 + 2, flr_msg, FG_COLOUR);
-	draw_string(20,LCD_Y / 5 * 3 + 2, liv_msg, FG_COLOUR);
-	draw_string(22,LCD_Y / 5 * 4 + 1, "restart", BG_COLOUR);
-
-	LCD_CMD(lcd_set_display_mode, lcd_display_inverse);
-	show_screen();
-	clear_screen();
-
-	if (BIT_IS_SET(PINF,5) || BIT_IS_SET(PINF, 6)){
+void restart_game(void){	
+	if (BIT_IS_SET(PINF,5) || BIT_IS_SET(PINF, 6)){	
 		gameOver = 0;
+		gameStart = 0;
+		lives = 3;
+		time = 0; min = 0;
+		while(BIT_IS_SET(PINF,5) || BIT_IS_SET(PINF, 6)){};
 		main();
 		clear_screen();
+
 	}
+
 }

@@ -11,6 +11,18 @@ Sprite left;
 Sprite right;
 Sprite top;
 Sprite bottom;
+Sprite wall_1;
+Sprite wall_2;
+Sprite wall_3;
+Sprite wall_4;
+Sprite wall_5;
+Sprite wall_6;
+
+int random_number = 0;
+
+int rand_number(void);
+void random_level_generator(int levels);
+void random_level_drawer(int levels);
 
 void create_scroll_border(void){
 	sprite_init(&left,-21,-12,VERWIDTH,VERHEIGHT,verBitmaps);
@@ -29,19 +41,19 @@ void draw_scroll_border(void){
 void create_floor(int lvl){
 
 	create_scroll_border();
+	sprite_init(&player, round((LCD_X - PLAYERWIDTH) / 2), round((LCD_Y - PLAYERHEIGHT) / 2), PLAYERWIDTH, PLAYERHEIGHT, playerBitmaps);
 
 	if (lvl == 0){
-		sprite_init(&player, round((LCD_X - PLAYERWIDTH) / 2), round((LCD_Y - PLAYERHEIGHT) / 2), PLAYERWIDTH, PLAYERHEIGHT, playerBitmaps);
 		sprite_init(&tower, 5.5, -12, TOWERWIDTH, TOWERHEIGHT, towerBitmaps);
 		sprite_init(&door, (TOWERWIDTH + 1) / 2, TOWERHEIGHT - DOORHEIGHT - 12, DOORWIDTH, DOORHEIGHT, doorBitmaps);
 		sprite_init(&enemy, 90, -3, ENEMYWIDTH, ENEMYHEIGHT, enemyBitmaps);
 		sprite_init(&key, -6, -3, KEYWIDTH, KEYHEIGHT, keyBitmaps);
 	}
 	if (lvl == 1){
-		sprite_init(&player, LCD_X / 2 - 3, LCD_Y - PLAYERHEIGHT - 3, PLAYERWIDTH, PLAYERHEIGHT, playerBitmaps);
-		sprite_init(&door, (TOWERWIDTH + 1) / 2, TOWERHEIGHT - DOORHEIGHT, DOORWIDTH, DOORHEIGHT, doorBitmaps);
-		sprite_init(&enemy, LCD_X - 8, LCD_Y / 2, ENEMYWIDTH, ENEMYHEIGHT, enemyBitmaps);
-		sprite_init(&key, 5, LCD_Y / 2, KEYWIDTH, KEYHEIGHT, keyBitmaps);
+		random_level_generator(1);
+	}
+	if (lvl >= 2){
+		random_level_generator(2);
 	}
 }
 
@@ -51,12 +63,13 @@ void draw_level(int lvl){
 		sprite_draw(&tower);
 		sprite_draw(&door);
 		sprite_draw(&enemy);
-	}
-	if (lvl == 0){
-		sprite_draw(&tower);
-		sprite_draw(&door);
-		sprite_draw(&enemy);
 		sprite_draw(&key);
+	}
+	if (lvl == 1){
+		random_level_drawer(1);		
+	}
+	if (lvl >= 2){
+		random_level_drawer(2);
 	}
 }
 
@@ -72,5 +85,54 @@ void draw_in_border(void){
 		set_pixel(w,1,FG_COLOUR);
 		set_pixel(w,47, FG_COLOUR);
 		set_pixel(w,46,FG_COLOUR);
+	}
+}
+
+int rand_number(void){
+	random_number = (rand() % 10) + 1;
+	return random_number;
+}
+
+int rand_between(int min, int max){
+	random_number = (rand() % max + 1 - min) + min;
+	return random_number;
+}
+
+void random_level_generator(int levels){
+	if (levels == 1){
+		int door_x, door_y, key_x, key_y; //, tre_x, tre_y, enemy_x, enemy_y;
+		door_x = rand_between(-10,103);
+		door_y = rand_between(-19,53);
+		key_x = rand_between(-10,105);
+		key_y = rand_between(-19,57);
+
+		sprite_init(&door, door_x, door_y,DOORWIDTH,DOORHEIGHT, doorBitmaps);
+		sprite_init(&key, key_x, key_y, KEYWIDTH,KEYHEIGHT, keyBitmaps);
+	}
+	if (levels == 2){
+		sprite_init(&wall_1,-19,31,44,HORHEIGHT,horBitmaps);
+		sprite_init(&wall_2,-19,49,44,HORHEIGHT,horBitmaps);
+		sprite_init(&wall_3,38,31,44,HORHEIGHT,horBitmaps);
+		sprite_init(&wall_4,25,43,VERWIDTH,27,verBitmaps);
+		sprite_init(&door, -10,62 - DOORWIDTH,DOORWIDTH,DOORHEIGHT,doorBitmaps);
+	}
+}
+
+void random_level_drawer(int levels){
+
+	if (levels == 1){
+		sprite_draw(&door);
+		sprite_draw(&key);
+		sprite_draw(&enemy);
+	}
+	if (levels >= 2){
+		sprite_draw(&wall_1);
+		sprite_draw(&wall_2);
+		sprite_draw(&wall_3);
+		sprite_draw(&wall_4);
+		//sprite_draw(&wall_5);
+		//sprite_draw(&wall_6);
+		sprite_draw(&door);
+		sprite_draw(&enemy);
 	}
 }

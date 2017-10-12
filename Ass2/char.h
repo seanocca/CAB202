@@ -59,15 +59,15 @@ unsigned char keyBitmaps[] =
 #define KEYWIDTH 7
 #define KEYHEIGHT 3
 
-unsigned char thing1Bitmaps[] =
+unsigned char treasureBitmaps[] =
 {
 	0b00100000, //   #  
 	0b01110000, //  ### 
 	0b11111000, // #####
 };
 
-#define THING1WIDTH 5
-#define THING1HEIGHT 3
+#define TREASUREWIDTH 5
+#define TREASUREHEIGHT 3
 
 unsigned char towerBitmaps[] =
 {
@@ -173,10 +173,12 @@ unsigned char verBitmaps[] =
 	0b00111000, 
 	0b00111000, 
 	0b00111000,
+	0b00111000, 
+	0b00111000,
 };
 
 #define VERWIDTH 5
-#define VERHEIGHT 72
+#define VERHEIGHT 74
 
 unsigned char horBitmaps[] =
 {
@@ -186,6 +188,6 @@ unsigned char horBitmaps[] =
 };
 
 #define HORWIDTH  126
-#define HORHEIGHT  2
+#define HORHEIGHT  3
 
 #endif

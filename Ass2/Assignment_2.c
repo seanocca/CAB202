@@ -74,6 +74,9 @@ int pause_status(double min, double sec);
 void start_screen(void);
 void game_over(int lives, int flr, int score);
 
+uint8_t rand_number(void);
+uint8_t rand_between(int min, int max);
+
 /*-----------------------------------------------------------------------------------------------------*\
 
 												VARIABLES
@@ -166,14 +169,24 @@ void usb_serial_send(char*value){
 
 void serial_outputs(uint8_t scored, uint8_t c_floor, uint8_t lives_left, double time){
 
+	double pl_x = player.x, pl_y = player.y;
+
+	pl_x -= 4;
+	pl_y -= 4;
+
 	char *output = "[%i] Current Score: %i 	Current Floor: %i 	Lives Left: %i";
+	char *outTime = "TIME: %f";
 
-	if (gameStart == 1){
+	sprintf(outTime, "TIME: %i ", (int)time);
+	sprintf(output,"Score: %i | Floor: %i | Lives: %i | Pos: (%0.2f, %0.2f)", scored, c_floor, lives_left, pl_x, pl_y);
 
-		sprintf(output,"TIME: %f | Score: %i | Floor: %i | Lives: %i | Pos: (%0.2f, %0.2f)",time, scored, c_floor, lives_left, (double)player.x, (double)player.y);
+	usb_serial_send(outTime);
+	usb_serial_send(output);
 
-		usb_serial_send(output);
+	if (gameOver == 1){
+		gameStart = 0;
 	}
+
 }
  
 ISR(TIMER1_OVF_vect) {
@@ -188,7 +201,7 @@ ISR(TIMER1_OVF_vect) {
 
 ISR(TIMER0_OVF_vect){
 	gameTime++;
-	if ((int)gameTime % 60 == 0){
+	if ((int)gameTime % 60 == 0 && gameStart == 1){
 		serial_outputs(score, flr, lives, get_serial_time());
 	}
 }
@@ -266,7 +279,7 @@ void setup(void){
 
 void check_lvl_hits(void){
 	if (lives <= 0){
-		gameOver = 0;
+		gameOver = 1;
 	}
 	if (sprite_collision(&player, &key) == 1){
 		boolKey = 1;
@@ -375,6 +388,7 @@ void restart_game(void){
 		oflow_counter = 0;
 		time = 0; min = 0;
 		while(BIT_IS_SET(PINF,5) || BIT_IS_SET(PINF, 6));
+		usb_serial_set_control(usb_serial_get_control());
 		main();
 		clear_screen();
 
@@ -426,7 +440,7 @@ void move_player(void){
 	if (flr == 0){
 		//UP
 		if (BIT_IS_SET(PIND, 1)){
-			if (top.y + top.height <= 2 && player.y + round(PLAYERHEIGHT / 2) + 1 == LCD_Y / 2){
+			if (top.y + top.height <= 2 && player.y + round(PLAYERHEIGHT / 2) + 1 <= LCD_Y / 2){
 				tower.y++;
 				key.y++;
 				left.y++;
@@ -446,7 +460,7 @@ void move_player(void){
 		} else 
 		//DOWN
 		if (BIT_IS_SET(PINB, 7)){
-			if (bottom.y >= LCD_Y - 2 && player.y + round(PLAYERHEIGHT / 2)  + 1 == LCD_Y / 2){
+			if (bottom.y >= LCD_Y - 2 && player.y + round(PLAYERHEIGHT / 2)  + 1 >= LCD_Y / 2){
 				tower.y--;
 				key.y--;
 				left.y--;
@@ -465,7 +479,7 @@ void move_player(void){
 		} else
 		//LEFT
 		if (BIT_IS_SET(PINB, 1)){	
-			if (left.x + left.width <= 2 && player.x + round(PLAYERWIDTH / 2) + 1 == LCD_X / 2){
+			if (left.x + left.width <= 2 && player.x + round(PLAYERWIDTH / 2) + 1 <= LCD_X / 2){
 				tower.x++;
 				key.x++;
 				left.x++;
@@ -485,7 +499,7 @@ void move_player(void){
 		} else
 		//RIGHT
 		if (BIT_IS_SET(PIND, 0)){
-			if (right.x + right.width > LCD_X && player.x + round(PLAYERWIDTH / 2) + 1 == LCD_X / 2){
+			if (right.x + right.width > LCD_X && player.x + round(PLAYERWIDTH / 2) + 1 >= LCD_X / 2){
 				tower.x--;
 				key.x--;
 				left.x--;
@@ -699,12 +713,18 @@ void enemy_crawl(void){
 		if (sprite_collision(&player, &enemy[0]) == 1){
 			lives--;
 
-			sprite_init(&player, round((LCD_X - PLAYERWIDTH) / 2), round((LCD_Y - PLAYERHEIGHT) / 2), PLAYERWIDTH, PLAYERHEIGHT, playerBitmaps);
+			do {
+				player.x = rand_between(0,84 - ENEMYWIDTH);
+				player.y = rand_between(0,48 - ENEMYHEIGHT);
+			}while(sprite_collision(&player,&tower) || sprite_collision(&player,&door) || 
+				  sprite_collision(&player,&left) || sprite_collision(&player,&right) ||
+				  sprite_collision(&player,&top) || sprite_collision(&player,&bottom));
+
 		}
 	}
 
-	if (enemy[0].x <= 83 && enemy[0].x >= 0){
-		if (enemy[0].y <= 47 && enemy[0].y >= 0){
+	if (enemy[0].x + 1 >= 0 && enemy[0].x + enemy[0].width <= LCD_X){
+		if (enemy[0].y = 1 >= 0 && enemy[0].y + enemy[0].height <= LCD_Y){
 			if (enemy[0].x < player.x){
 				enemy[0].x += 0.1;
 			} 
@@ -738,10 +758,10 @@ uint8_t rand_between(int min, int max){
 }
 
 void create_scroll_border(void){
-	sprite_init(&left,-21,-14,VERWIDTH,VERHEIGHT,verBitmaps);
-	sprite_init(&right,106 - VERWIDTH + 1,-14,VERWIDTH,VERHEIGHT,verBitmaps);
-	sprite_init(&top,-21,-14,HORWIDTH, HORHEIGHT,horBitmaps);
-	sprite_init(&bottom,-19,60,HORWIDTH,HORHEIGHT,horBitmaps);
+	sprite_init(&left,-21 - VERWIDTH,-12 - HORHEIGHT,VERWIDTH,VERHEIGHT,verBitmaps);
+	sprite_init(&right,105 - VERWIDTH,-12 - HORHEIGHT,VERWIDTH,VERHEIGHT,verBitmaps);
+	sprite_init(&top,-21,-12 - HORHEIGHT,HORWIDTH, HORHEIGHT,horBitmaps);
+	sprite_init(&bottom,-21,76 + HORHEIGHT,HORWIDTH,HORHEIGHT,horBitmaps);
 }
 
 void draw_scroll_border(void){

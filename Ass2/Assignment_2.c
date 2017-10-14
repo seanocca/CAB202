@@ -42,7 +42,7 @@ void serial_outputs(uint8_t scored, uint8_t c_floor, uint8_t lives_left, double 
 void run_time(void);
 
 int sprite_collision(Sprite* collide, Sprite* object);
-int wall_collision_movement(Sprite* hero);
+int border_collision_movement(Sprite* hero);
 void check_lvl_hits(void);
 void key_follow(void);
 
@@ -202,7 +202,7 @@ ISR(TIMER1_OVF_vect) {
 ISR(TIMER0_OVF_vect){
 	gameTime++;
 	if ((int)gameTime % 60 == 0 && gameStart == 1){
-		serial_outputs(score, flr, lives, get_serial_time());
+		//serial_outputs(score, flr, lives, get_serial_time());
 	}
 }
 
@@ -259,7 +259,7 @@ void setup(void){
 
 	sei();
 
-	serial_USB();
+	//serial_USB();
 
 	//INITIALIZE JOYSTICK, SWITCHES, POMETERS AND LEDS
 	init_teensy();
@@ -413,7 +413,7 @@ int sprite_collision(Sprite* collide, Sprite* object){
 	return 0;	
 }
 
-int wall_collision_movement(Sprite* hero){
+int border_collision_movement(Sprite* hero){
 	if (hero->x <= 3){
 		hero->x++;
 		return 1;
@@ -433,6 +433,8 @@ int wall_collision_movement(Sprite* hero){
 	return 0;
 }
 
+
+
 void move_player(void){
 	player.is_visible = 1;
 
@@ -450,7 +452,7 @@ void move_player(void){
 				door.y++;
 				enemy[0].y++;
 			} else {
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.y--;
 				} else{
 					player.y++;
@@ -470,7 +472,7 @@ void move_player(void){
 				door.y--;
 				enemy[0].y--;
 			} else{
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.y++;
 				} else {
 					player.y--;
@@ -489,7 +491,7 @@ void move_player(void){
 				door.x++;
 				enemy[0].x++;
 			} else {
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.x--;
 				} else {
 					player.x++;
@@ -509,7 +511,7 @@ void move_player(void){
 				door.x--;
 				enemy[0].x--;
 			} else {
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.x++;
 				} else {
 					player.x--;
@@ -530,7 +532,7 @@ void move_player(void){
 				key.y++;
 				treasure[0].y++;
 			} else {
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.y--;
 				} else{
 					player.y++;
@@ -550,7 +552,7 @@ void move_player(void){
 				key.y--;
 				treasure[0].y--;
 			} else{
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.y++;
 				} else {
 					player.y--;
@@ -569,7 +571,7 @@ void move_player(void){
 				key.x++;
 				treasure[0].x++;
 			} else {
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.x--;
 				} else {
 					player.x++;
@@ -589,7 +591,7 @@ void move_player(void){
 				enemy[0].x--;
 				treasure[0].x--;
 			} else {
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.x++;
 				} else {
 					player.x--;
@@ -616,7 +618,7 @@ void move_player(void){
 					walls_down[i].y++;
 				}
 			} else {
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.y--;
 				} else{
 					player.y++;
@@ -642,7 +644,7 @@ void move_player(void){
 					walls_down[i].y--;
 				}
 			} else{
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.y++;
 				} else {
 					player.y--;
@@ -667,7 +669,7 @@ void move_player(void){
 					walls_down[i].x++;
 				}
 			} else {
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.x--;
 				} else {
 					player.x++;
@@ -693,7 +695,7 @@ void move_player(void){
 					walls_down[i].x--;
 				}
 			} else {
-				if (wall_collision_movement(&player) == 0){
+				if (border_collision_movement(&player) == 0){
 					player.x++;
 				} else {
 					player.x--;
@@ -718,13 +720,13 @@ void enemy_crawl(void){
 				player.y = rand_between(0,48 - ENEMYHEIGHT);
 			}while(sprite_collision(&player,&tower) || sprite_collision(&player,&door) || 
 				  sprite_collision(&player,&left) || sprite_collision(&player,&right) ||
-				  sprite_collision(&player,&top) || sprite_collision(&player,&bottom));
+				  sprite_collision(&player,&top) || sprite_collision(&player,&bottom) );
 
 		}
 	}
 
 	if (enemy[0].x + 1 >= 0 && enemy[0].x + enemy[0].width <= LCD_X){
-		if (enemy[0].y = 1 >= 0 && enemy[0].y + enemy[0].height <= LCD_Y){
+		if (enemy[0].y + 1 >= 0 && enemy[0].y + enemy[0].height <= LCD_Y){
 			if (enemy[0].x < player.x){
 				enemy[0].x += 0.1;
 			} 
@@ -761,7 +763,7 @@ void create_scroll_border(void){
 	sprite_init(&left,-21 - VERWIDTH,-12 - HORHEIGHT,VERWIDTH,VERHEIGHT,verBitmaps);
 	sprite_init(&right,105 - VERWIDTH,-12 - HORHEIGHT,VERWIDTH,VERHEIGHT,verBitmaps);
 	sprite_init(&top,-21,-12 - HORHEIGHT,HORWIDTH, HORHEIGHT,horBitmaps);
-	sprite_init(&bottom,-21,76 + HORHEIGHT,HORWIDTH,HORHEIGHT,horBitmaps);
+	sprite_init(&bottom,-21,76 - 12 + HORHEIGHT,HORWIDTH,HORHEIGHT,horBitmaps);
 }
 
 void draw_scroll_border(void){
@@ -811,7 +813,6 @@ void sprites_init(void){
 	}
 
 	//DOOR POSSIBLE LOCATIONS
-
 	doors[0].x = -16; 				doors[0].y = -10;
 	doors[1].x = -16; 				doors[1].y = 60 - DOORHEIGHT;
 	doors[2].x = 102 - DOORWIDTH;	doors[2].y = -10;
@@ -822,10 +823,10 @@ void place_sprites(int level){
 	sprites_init();
 
 	if (level == 0){
-		tower.x = 5.5; 					tower.y = -12;
-		door.x = (TOWERWIDTH + 1) / 2; 	door.y = TOWERHEIGHT - DOORHEIGHT - 12;
+		tower.x = 5.5; 					tower.y = -15;
+		door.x = (TOWERWIDTH + 1) / 2; 	door.y = TOWERHEIGHT - DOORHEIGHT - 15;
 		enemy[0].x = 90;				enemy[0].y = -3;
-		key.x = -6;						key.y = -3;
+		key.x = -9;						key.y = -5;
 	}
 	if (level == 1){
 		random_level_generator(1);
@@ -902,7 +903,6 @@ void random_level_drawer(int levels){
 		sprite_draw(&enemy[0]);
 	}
 }
-
 
 /*-----------------------------------------------------------------------------------------------------*\
 
@@ -1020,5 +1020,17 @@ void game_over(int lives, int flr, int score){
 	LCD_CMD(lcd_set_display_mode, lcd_display_inverse);
 	show_screen();
 	clear_screen();
-
 }
+
+
+/*//ADC
+void aim_bot( void ) {
+    int right_adc = adc_read(1);
+ 
+    int line_end_x = player.x + (player.width / 2);
+    int line_end_y = player.y + (player.height / 2);
+    int line_length = 10;
+    int start_x = line_end_x + (line_length * cos((float)right_adc / (1023 / 12.7)));
+    int start_y = line_end_y + (line_length * sin((float)right_adc / (1023 / 12.7)));
+    draw_line (start_x,start_y,line_end_x, line_end_y, FG_COLOUR);
+}*/

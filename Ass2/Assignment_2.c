@@ -37,14 +37,15 @@
 
 void serial_USB(void);
 double get_serial_time(void);
-void serial_outputs(uint8_t scored, uint8_t c_floor, uint8_t lives_left, double time);
+void serial_outputs(void);
 
 void run_time(void);
 
 int sprite_collision(Sprite* collide, Sprite* object);
-int border_collision_movement(Sprite* hero);
+int border_wall_collision_movement(Sprite* hero);
+int sprite_drop_collision(Sprite* sprited);
 void check_lvl_hits(void);
-void key_follow(void);
+void item_follow(void);
 
 void move_player(void);
 void enemy_crawl(void);
@@ -53,29 +54,27 @@ void restart_game(void);
 
 void init_teensy(void);
 
-void random_level_generator(int levels);
-void random_level_drawer(int levels);
+void random_level_generator(void);
+void random_level_drawer(void);
 
 void create_scroll_border(void);
 void draw_scroll_border(void);
 void draw_in_border(void);
 
 void sprites_init(void);
-void place_sprites(int level);
+void place_sprites(int lvl);
 
 void draw_level(int lvl);
 
-void get_screen_numbers(int scr, int floor, int live);
 void show_load_screen(void);
 
-void draw_double(uint8_t x, uint8_t y, double seconds, double minutes, colour_t colour);
+void draw_double(int x, int y, double seconds, double minutes, colour_t colour);
 
 int pause_status(double min, double sec);
 void start_screen(void);
-void game_over(int lives, int flr, int score);
+void game_over(void);
 
-uint8_t rand_number(void);
-uint8_t rand_between(int min, int max);
+int rand_between(int min, int max);
 
 /*-----------------------------------------------------------------------------------------------------*\
 
@@ -85,12 +84,18 @@ uint8_t rand_between(int min, int max);
 
 Sprite player;
 Sprite tower;
+
 Sprite key;
 Sprite door;
+
 Sprite left;
 Sprite right;
 Sprite top;
 Sprite bottom;
+
+Sprite bomb;
+Sprite bow;
+Sprite shield;
 
 Sprite enemy[MAX_ENEMY_TREASURE];
 Sprite treasure[MAX_ENEMY_TREASURE];
@@ -100,25 +105,35 @@ Sprite walls_across[NUM_WALLS_ACROSS];
 
 Sprite doors[4];
 
-uint8_t num_enemies, num_treasures;
+int num_enemies = 0, num_treasures,
+	pausing = 0, gameOver = 0, gameStart = 0,
+	received = 0, flr = 0, lives = 0, boolKey = 0,
+	loading = 0, score = 0, bomb_check = 0, shield_check = 0, bow_check = 0;
 
-uint8_t pausing = 0, gameOver = 0, gameStart = 0,
-	received = 0, flr, score, lives, boolKey = 0,
-	loading = 0;
+int shield_likelihood, bomb_likelihood, bow_likelihood; 
 
 double time = 0, min = 0;
+
+double pl_x, pl_y;
  
 volatile int oflow_counter = 0, gameTime = 0;
  
 char buffer[81];
 
-char *keyCollect = "[%d] Player found the Key";
+char *keyCollect = "Player has found the Key";
+char *treasureCollect = "Player has found one of the Treasures";
+char *shieldCollect = "Player has found the Shield";
+char *bombCollect = "Player has found the Bomb";
+char *bowCollect = "Player has found the Bow";
 
+char *completeLvl = "Player has completed this Level";
+char *gameDone = "GAME OVER";
 
 char *flr_msg = "Floor: %d";
-char *tim_msg = "Time: %02d:%02d";
-char *score_msg = "Score: %d";
+char *tim_msg = "Time: %02f:%02f";
+char *score_msg = "Score: %0d";
 char *liv_msg = "Lives: %d";
+char *output = "[%f] Score: %i Floor: %i Lives: %i Pos: (%0.2f, %0.2f)";
 
 /*-----------------------------------------------------------------------------------------------------*\
 
@@ -149,10 +164,11 @@ void init_teensy(void){
 	TCCR1B = 4;
 	TIMSK1 = 1;
 
-	//SETUP 8 BIT TIMER
+	/*//SETUP 8 BIT TIMER
 	TCCR0A = 0;
 	TCCR0B = 4;
-	TIMSK0 = 1;
+	TIMSK0 = 1;*/
+	
 }
 
 void usb_serial_send(char*value){
@@ -167,25 +183,11 @@ void usb_serial_send(char*value){
 	usb_serial_putchar('\n');
 }
 
-void serial_outputs(uint8_t scored, uint8_t c_floor, uint8_t lives_left, double time){
+void serial_outputs(void){
 
-	double pl_x = player.x, pl_y = player.y;
+	sprintf(output, "%f Score: %0d Floor: %d Lives: %d Pos: %0.2f, %0.2f", get_serial_time(), score, flr, lives, pl_x, pl_y);
 
-	pl_x -= 4;
-	pl_y -= 4;
-
-	char *output = "[%i] Current Score: %i 	Current Floor: %i 	Lives Left: %i";
-	char *outTime = "TIME: %f";
-
-	sprintf(outTime, "TIME: %i ", (int)time);
-	sprintf(output,"Score: %i | Floor: %i | Lives: %i | Pos: (%0.2f, %0.2f)", scored, c_floor, lives_left, pl_x, pl_y);
-
-	usb_serial_send(outTime);
 	usb_serial_send(output);
-
-	if (gameOver == 1){
-		gameStart = 0;
-	}
 
 }
  
@@ -199,12 +201,12 @@ ISR(TIMER1_OVF_vect) {
 	}
 }
 
-ISR(TIMER0_OVF_vect){
-	gameTime++;
-	if ((int)gameTime % 60 == 0 && gameStart == 1){
-		//serial_outputs(score, flr, lives, get_serial_time());
+/*ISR(TIMER0_OVF_vect){	
+	gameTime++;	
+	if (gameTime % 60 == 0 && gameStart == 1){
+		serial_outputs();
 	}
-}
+}*/
 
 void run_time(void){
 	time = ( oflow_counter * 65536.0 + TCNT1 ) * PRESCALE  / FREQ;
@@ -247,7 +249,7 @@ void serial_USB(void){
 }
 
 void setup(void){
-	srand(time);
+	srand(get_serial_time());
 
 	//SET CLOCK SPEED
 	set_clock_speed(CPU_8MHz);
@@ -259,14 +261,14 @@ void setup(void){
 
 	sei();
 
-	//serial_USB();
+	serial_USB();
 
 	//INITIALIZE JOYSTICK, SWITCHES, POMETERS AND LEDS
 	init_teensy();
 
 	lives = 3;
 
-	boolKey = 0; 
+	boolKey = 1; 
 	pausing = 0; 
 
 	flr = 0;
@@ -280,68 +282,230 @@ void setup(void){
 void check_lvl_hits(void){
 	if (lives <= 0){
 		gameOver = 1;
+		gameStart = 0;
+		usb_serial_send(gameDone);
 	}
-	if (sprite_collision(&player, &key) == 1){
+	if (sprite_collision(&player, &key) && boolKey == 0){
 		boolKey = 1;
+		usb_serial_send(keyCollect);
 	}
 
 	if (sprite_collision(&player, &door) == 1 && boolKey == 1){
 		flr++;
 		score += 100;
 		boolKey = 0;
-		get_screen_numbers(score, flr, lives);
+		bomb_check = 0;
+		shield_check = 0;
+		bow_check = 0;
+		for(int i = 0; i < NUM_WALLS_ACROSS; i++){
+			walls_down[i].x = -1000;
+			walls_across[i].x = -1000;
+		}
+		show_load_screen();
+		_delay_ms(5);
+		usb_serial_send(completeLvl);
+		_delay_ms(5);
 		place_sprites(flr);
-		loading = 1;
 	}
 
-	if (flr == 0){
-		if ((sprite_collision(&player,&door) == 1 && boolKey == 0) || (sprite_collision(&player,&tower))) {
-			player.y++;
+	for (int i = 0; i < num_treasures; i++){
+		if (sprite_collision(&player, &treasure[i])){
+			usb_serial_send(treasureCollect);
+			treasure[i].x = -1000;
+			_delay_ms(5);
+			score += 15;
 		}
 	}
-	if (flr == 1){
 
+	if (sprite_collision(&player, &bomb) && bomb_check == 0){
+		usb_serial_send(bombCollect);
+		bomb_check = 1;
+		bow_check = 0;
+		shield_check = 0;
 	}
-	if (flr >= 2){
 
+	if (sprite_collision(&player, &shield) && shield_check == 0){
+		usb_serial_send(shieldCollect);
+		shield_check = 1;
+		bomb_check = 0;
+		bow_check = 0;
 	}
+
+	if (sprite_collision(&player, &bow) && bow_check == 0){
+		usb_serial_send(bowCollect);
+		bow_check = 1;
+		bomb_check = 0;
+		shield_check = 0;
+	}
+
 }
 
-void key_follow(void){
+void item_follow(void){
 	if (boolKey == 1){
 		//UP
 		if (BIT_IS_SET(PIND, 1)){
-			key.y = player.y + player.height;
-			key.x = player.x - 1;
+			key.y = player.y + player.height + key.height;
+			key.x = player.x - 3;
 		} else 
 		//DOWN
 		if (BIT_IS_SET(PINB, 7)){
-			key.y = player.y - key.height - 1;
-			key.x = player.x ;
+			key.y = player.y - key.height - key.height;
+			key.x = player.x;
 		} else
 		//LEFT
 		if (BIT_IS_SET(PINB, 1)){	
-			key.x = player.x + key.width;
+			key.x = player.x + key.width + 3;
 			key.y = player.y + player.height - key.height;			
 		} else
 		//RIGHT
 		if (BIT_IS_SET(PIND, 0)){
-			key.x = player.x - key.width;
+			key.x = player.x - key.width - 3;
 			key.y = player.y + player.height - key.height;	
 		}
 	}
 
-	sprite_draw(&key);
+	if (bomb_check == 1){
+		//UP
+		if (BIT_IS_SET(PIND, 1)){
+			if (boolKey == 0){
+				bomb.y = player.y + player.height;
+				bomb.x = player.x - 2;
+			}else {
+				bomb.y = player.y + player.height + key.height;
+				bomb.x = player.x - 2;
+			}
+		} else 
+		//DOWN
+		if (BIT_IS_SET(PINB, 7)){
+			if (boolKey == 0){
+				bomb.y = player.y - bomb.height;
+				bomb.x = player.x - 2;
+			}else {
+				bomb.y = player.y - key.height - bomb.height - 1;
+				bomb.x = player.x - 2;
+			}
+		} else
+		//LEFT
+		if (BIT_IS_SET(PINB, 1)){	
+			if (boolKey == 0){
+				bomb.y = player.y + player.height - bomb.height - 1;
+				bomb.x = player.x + player.width;
+			}else {
+				bomb.y = player.y - key.height - 1;
+				bomb.x = player.x + player.width;
+			}			
+		} else
+		//RIGHT
+		if (BIT_IS_SET(PIND, 0)){
+			if (boolKey == 0){
+				bomb.y = player.y + player.height - bomb.height - 1;
+				bomb.x = player.x - bomb.width;
+			}else {
+				bomb.y = player.y + player.height - key.height - 1;
+				bomb.x = player.x - bomb.width - key.height;
+			}
+		}
+	}
+
+	if (shield_check == 1){
+		//UP
+		if (BIT_IS_SET(PIND, 1)){
+			if (boolKey == 0){
+				shield.y = player.y + player.height;
+				shield.x = player.x - 2;
+			}else {
+				shield.y = player.y + player.height + key.height;
+				shield.x = player.x - 2;
+			}
+		} else 
+		//DOWN
+		if (BIT_IS_SET(PINB, 7)){
+			if (boolKey == 0){
+				shield.y = player.y - shield.height;
+				shield.x = player.x - 2;
+			}else {
+				shield.y = player.y - key.height - shield.height - 1;
+				shield.x = player.x - 2;
+			}
+		} else
+		//LEFT
+		if (BIT_IS_SET(PINB, 1)){	
+			if (boolKey == 0){
+				shield.y = player.y + player.height - shield.height - 1;
+				shield.x = player.x + player.width;
+			}else {
+				shield.y = player.y - key.height - 1;
+				shield.x = player.x + player.width;
+			}			
+		} else
+		//RIGHT
+		if (BIT_IS_SET(PIND, 0)){
+			if (boolKey == 0){
+				shield.y = player.y + player.height - shield.height - 1;
+				shield.x = player.x - shield.width;
+			}else {
+				shield.y = player.y + player.height - key.height - 1;
+				shield.x = player.x - shield.width - key.width - 3;
+			}
+		}
+	}
+
+	if (bow_check == 1){
+		//UP
+		if (BIT_IS_SET(PIND, 1)){
+			if (boolKey == 0){
+				bow.y = player.y + player.height;
+				bow.x = player.x - 2;
+			}else {
+				bow.y = player.y + player.height + key.height;
+				bow.x = player.x - 2;
+			}
+		} else 
+		//DOWN
+		if (BIT_IS_SET(PINB, 7)){
+			if (boolKey == 0){
+				bow.y = player.y - bow.height;
+				bow.x = player.x - 2;
+			}else {
+				bow.y = player.y - key.height - bow.height - 1;
+				bow.x = player.x - 2;
+			}
+		} else
+		//LEFT
+		if (BIT_IS_SET(PINB, 1)){	
+			if (boolKey == 0){
+				bow.y = player.y + player.height - bow.height - 1;
+				bow.x = player.x + player.width;
+			}else {
+				bow.y = player.y - key.height - 1;
+				bow.x = player.x + player.width;
+			}			
+		} else
+		//RIGHT
+		if (BIT_IS_SET(PIND, 0)){
+			if (boolKey == 0){
+				bow.y = player.y + player.height - bow.height - 1;
+				bow.x = player.x - bow.width;
+			}else {
+				bow.y = player.y + player.height - key.height - 1;
+				bow.x = player.x - bow.width - key.width;
+			}
+		}
+	}
 }
 
 void process(void){
+
+	pl_x = player.x - left.x - left.width;
+	pl_y = player.y - top.y - top.height;
+
 	clear_screen();
 
 	draw_scroll_border();
 
 	move_player();
 
-	key_follow();
+	item_follow();
 
 	draw_level(flr);
 
@@ -353,29 +517,22 @@ void process(void){
 }
 
 int main(void){	
+	srand(get_serial_time());
 	setup();
 
-	while(gameStart == 0){
-		start_screen();
-	}
+	while(gameStart == 0){start_screen();}
 
 	while (gameOver == 0 && gameStart == 1) {
-		run_time();
-		if (loading == 0){
-			if (pause_status(time, min) == 0){
-				process();
-			} else {
-				get_screen_numbers(score, flr, lives);
-				pause_status(time, min);
-			}
+		run_time();	
+		if (pause_status(time, min) == 0){
+			process();
 		} else {
-			show_load_screen();
+			pause_status(time, min);
 		}
 	}	
-
 	while(gameOver == 1){
 		restart_game();
-		game_over(flr, lives, score);
+		game_over();
 	}
 	return 0;
 }
@@ -387,11 +544,12 @@ void restart_game(void){
 		lives = 3;
 		oflow_counter = 0;
 		time = 0; min = 0;
-		while(BIT_IS_SET(PINF,5) || BIT_IS_SET(PINF, 6));
-		usb_serial_set_control(usb_serial_get_control());
-		main();
-		clear_screen();
+		boolKey = 0;
 
+		while(BIT_IS_SET(PINF,5) || BIT_IS_SET(PINF, 6));
+
+		usb_serial_set_control(usb_serial_get_control());
+		clear_screen();
 	}
 }
 
@@ -408,37 +566,58 @@ int sprite_collision(Sprite* collide, Sprite* object){
 	if (coll_left <= obj_right && coll_right >= obj_left){
 		if (coll_top <= obj_bott && coll_bott >= obj_top){
 			return 1;
-		} 
+		}
 	} 
 	return 0;	
 }
 
-int border_collision_movement(Sprite* hero){
-	if (hero->x <= 3){
-		hero->x++;
-		return 1;
-	}
-	if (hero->x + hero->width >= LCD_X - 3){
-		hero->x--;
-		return 1;
-	} 
-	if(hero->y <= 3){
-		hero->y++;
-		return 1;
-	} 
-	if(hero->y + hero->height >= LCD_Y - 3){
-		hero->y--;
-		return 1;
-	} 
-	return 0;
+int border_wall_collision_movement(Sprite* hero){
+	if (sprite_collision(hero,&left ) ||
+		sprite_collision(hero,&right) ||
+		sprite_collision(hero,&bottom) ||
+		sprite_collision(hero, &top)){return 1;}
+
+	if (sprite_collision(hero,&tower))return 1;
+
+	if ((sprite_collision(hero, &walls_down[0])) || 
+   (sprite_collision(hero, &walls_down[1])) ||
+   (sprite_collision(hero, &walls_down[2])) ||
+   (sprite_collision(hero, &walls_across[0])) ||
+   (sprite_collision(hero, &walls_across[1])) ||
+   (sprite_collision(hero, &walls_across[2]))) {return 1;}
+
+   return 0;
 }
 
-
+int sprite_drop_collision(Sprite* sprited){
+	if ((sprite_collision(sprited, &walls_down[0]) && sprited != &walls_down[0]) || 
+	   (sprite_collision(sprited, &walls_down[1]) && sprited != &walls_down[1]) ||
+	   (sprite_collision(sprited, &walls_down[2]) && sprited != &walls_down[2]) ||
+	   (sprite_collision(sprited, &walls_across[0]) && sprited != &walls_across[0]) ||
+	   (sprite_collision(sprited, &walls_across[1]) && sprited != &walls_across[1]) ||
+	   (sprite_collision(sprited, &walls_across[2]) && sprited != &walls_across[2]) ||
+	   (sprite_collision(sprited, &shield) && sprited != &shield) ||
+	   (sprite_collision(sprited, &bow) && sprited != &bow) ||
+	   (sprite_collision(sprited, &bomb) && sprited != &bomb) ||
+	   (sprite_collision(sprited, &enemy[0]) && sprited != &enemy[0]) ||
+	   (sprite_collision(sprited, &enemy[1]) && sprited != &enemy[1]) ||
+	   (sprite_collision(sprited, &enemy[2]) && sprited != &enemy[2]) ||
+	   (sprite_collision(sprited, &enemy[3]) && sprited != &enemy[3]) ||
+	   (sprite_collision(sprited, &enemy[4]) && sprited != &enemy[4]) ||
+	   (sprite_collision(sprited, &treasure[0]) && sprited != &treasure[0]) ||
+	   (sprite_collision(sprited, &treasure[1]) && sprited != &treasure[1]) ||
+	   (sprite_collision(sprited, &treasure[2]) && sprited != &treasure[2]) ||
+	   (sprite_collision(sprited, &treasure[3]) && sprited != &treasure[3]) ||
+	   (sprite_collision(sprited, &treasure[4]) && sprited != &treasure[4]) ||
+	   (sprite_collision(sprited, &door) && sprited != &door)) {
+		return 1;
+	} else {return 0;}
+}
 
 void move_player(void){
 	player.is_visible = 1;
 
-	//object movement is inversed to show correct player moaccvement;
+	//object movement is inversed to show correct player movement;
 	if (flr == 0){
 		//UP
 		if (BIT_IS_SET(PIND, 1)){
@@ -452,13 +631,9 @@ void move_player(void){
 				door.y++;
 				enemy[0].y++;
 			} else {
-				if (border_collision_movement(&player) == 0){
-					player.y--;
-				} else{
-					player.y++;
-				}
-			}
-			
+				if (!border_wall_collision_movement(&player)){player.y--;} 
+				else{player.y += 2;}
+			}			
 		} else 
 		//DOWN
 		if (BIT_IS_SET(PINB, 7)){
@@ -472,11 +647,8 @@ void move_player(void){
 				door.y--;
 				enemy[0].y--;
 			} else{
-				if (border_collision_movement(&player) == 0){
-					player.y++;
-				} else {
-					player.y--;
-				}
+				if (!border_wall_collision_movement(&player)){player.y++;} 
+				else {player.y -= 2;}
 			}
 		} else
 		//LEFT
@@ -491,17 +663,13 @@ void move_player(void){
 				door.x++;
 				enemy[0].x++;
 			} else {
-				if (border_collision_movement(&player) == 0){
-					player.x--;
-				} else {
-					player.x++;
-				}
+				if (!border_wall_collision_movement(&player)){player.x--;} 
+				else {player.x += 2;}
 			}
-			
 		} else
 		//RIGHT
 		if (BIT_IS_SET(PIND, 0)){
-			if (right.x + right.width > LCD_X && player.x + round(PLAYERWIDTH / 2) + 1 >= LCD_X / 2){
+			if (right.x + right.width >= LCD_X - 2 && player.x + round(PLAYERWIDTH / 2) + 1 >= LCD_X / 2){
 				tower.x--;
 				key.x--;
 				left.x--;
@@ -511,195 +679,98 @@ void move_player(void){
 				door.x--;
 				enemy[0].x--;
 			} else {
-				if (border_collision_movement(&player) == 0){
-					player.x++;
-				} else {
-					player.x--;
-				}
+				if (!border_wall_collision_movement(&player)){player.x++;} 
+				else {player.x += 2;}
 			}
 		}
 	} 
-	if (flr == 1){
+	
+	if (flr >= 1){
 		//UP
 		if (BIT_IS_SET(PIND, 1)){
-			if (top.y + top.height <= 2 && player.y + round(PLAYERHEIGHT / 2) + 1 == LCD_Y / 2){
+			if (top.y + top.height <= 2 && player.y + round(PLAYERHEIGHT / 2) + 1 <= LCD_Y / 2
+				){
 				left.y++;
 				right.y++;
 				top.y++;
 				bottom.y++;
 				door.y++;
-				enemy[0].y++;
 				key.y++;
-				treasure[0].y++;
+				bomb.y++;
+				shield.y++;
+				bow.y++;
+				for (int i = 0; i < num_treasures; i++){treasure[i].y++;}
+				for (int i = 0; i < num_enemies; i++){enemy[i].y++;}
+				for (int i = 0; i < NUM_WALLS_ACROSS; i++){walls_across[i].y++;}
+				for (int i = 0; i < NUM_WALLS_DOWN; i++){walls_down[i].y++;}
 			} else {
-				if (border_collision_movement(&player) == 0){
-					player.y--;
-				} else{
-					player.y++;
-				}
+				if (!border_wall_collision_movement(&player)){player.y--;} 
+				else{player.y += 2;}
 			}
 			
 		} else 
 		//DOWN
 		if (BIT_IS_SET(PINB, 7)){
-			if (bottom.y >= LCD_Y - 2 && player.y + round(PLAYERHEIGHT / 2)  + 1 == LCD_Y / 2){
+			if (bottom.y + bottom.height > LCD_Y && player.y + round(PLAYERHEIGHT / 2) + 1 >= LCD_Y / 2){
 				left.y--;
 				right.y--;
 				top.y--;
 				bottom.y--;
 				door.y--;
-				enemy[0].y--;
 				key.y--;
-				treasure[0].y--;
+				bomb.y--;
+				shield.y--;
+				bow.y--;
+				for (int i = 0; i < num_treasures; i++){treasure[i].y--;}
+				for (int i = 0; i < num_enemies; i++){enemy[i].y--;}
+				for (int i = 0; i < NUM_WALLS_ACROSS; i++){walls_across[i].y--;}
+				for (int i = 0; i < NUM_WALLS_DOWN; i++){walls_down[i].y--;}
 			} else{
-				if (border_collision_movement(&player) == 0){
-					player.y++;
-				} else {
-					player.y--;
-				}
+				if (!border_wall_collision_movement(&player)){player.y++;} 
+				else {player.y -= 2;}
 			}
 		} else
 		//LEFT
 		if (BIT_IS_SET(PINB, 1)){	
-			if (left.x + left.width <= 2 && player.x + round(PLAYERWIDTH / 2) + 1 == LCD_X / 2){
+			if (left.x < 0 && player.x + round(PLAYERWIDTH / 2) + 1 <= LCD_X / 2){
 				left.x++;
 				right.x++;
 				top.x++;
 				bottom.x++;
 				door.x++;
-				enemy[0].x++;
 				key.x++;
-				treasure[0].x++;
+				bomb.x++;
+				shield.x++;
+				bow.x++;
+				for (int i = 0; i < num_treasures; i++){treasure[i].x++;}
+				for (int i = 0; i < num_enemies; i++){enemy[i].x++;}				
+				for (int i = 0; i < NUM_WALLS_ACROSS; i++){walls_across[i].x++;}
+				for (int i = 0; i < NUM_WALLS_DOWN; i++){walls_down[i].x++;}
 			} else {
-				if (border_collision_movement(&player) == 0){
-					player.x--;
-				} else {
-					player.x++;
-				}
+				if (!border_wall_collision_movement(&player)){player.x--;} 
+				else {player.x += 2;}
 			}
 			
 		} else
 		//RIGHT
 		if (BIT_IS_SET(PIND, 0)){
-			if (right.x + right.width > LCD_X && player.x + round(PLAYERWIDTH / 2) + 1 == LCD_X / 2){
+			if (right.x + right.width > LCD_X && player.x + round(PLAYERWIDTH / 2) + 1 >= LCD_X / 2){
 				left.x--;
 				right.x--;
 				top.x--;
 				bottom.x--;
 				key.x--;
 				door.x--;
-				enemy[0].x--;
-				treasure[0].x--;
+				bomb.x--;
+				shield.x--;
+				bow.x--;
+				for (int i = 0; i < num_treasures; i++){treasure[i].x--;}
+				for (int i = 0; i < num_enemies; i++){enemy[i].x--;}
+				for (int i = 0; i < NUM_WALLS_ACROSS; i++){walls_across[i].x--;}
+				for (int i = 0; i < NUM_WALLS_DOWN; i++){walls_down[i].x--;}
 			} else {
-				if (border_collision_movement(&player) == 0){
-					player.x++;
-				} else {
-					player.x--;
-				}
-			}
-		}
-	}
-	if (flr >= 2){
-		//UP
-		if (BIT_IS_SET(PIND, 1)){
-			if (top.y + top.height <= 2 && player.y + round(PLAYERHEIGHT / 2) + 1 == LCD_Y / 2){
-				left.y++;
-				right.y++;
-				top.y++;
-				bottom.y++;
-				door.y++;
-				enemy[0].y++;
-				key.y++;
-				//treasure.y++;
-				for (int i = 0; i < NUM_WALLS_ACROSS; i++){
-					walls_across[i].y++;
-				}
-				for (int i = 0; i< NUM_WALLS_DOWN; i++){
-					walls_down[i].y++;
-				}
-			} else {
-				if (border_collision_movement(&player) == 0){
-					player.y--;
-				} else{
-					player.y++;
-				}
-			}
-			
-		} else 
-		//DOWN
-		if (BIT_IS_SET(PINB, 7)){
-			if (bottom.y >= LCD_Y - 2 && player.y + round(PLAYERHEIGHT / 2)  + 1 == LCD_Y / 2){
-				left.y--;
-				right.y--;
-				top.y--;
-				bottom.y--;
-				door.y--;
-				enemy[0].y--;
-				key.y--;
-				//treasure.y--;
-				for (int i = 0; i < NUM_WALLS_ACROSS; i++){
-					walls_across[i].y--;
-				}
-				for (int i = 0; i< NUM_WALLS_DOWN; i++){
-					walls_down[i].y--;
-				}
-			} else{
-				if (border_collision_movement(&player) == 0){
-					player.y++;
-				} else {
-					player.y--;
-				}
-			}
-		} else
-		//LEFT
-		if (BIT_IS_SET(PINB, 1)){	
-			if (left.x + left.width <= 2 && player.x + round(PLAYERWIDTH / 2) + 1 == LCD_X / 2){
-				left.x++;
-				right.x++;
-				top.x++;
-				bottom.x++;
-				door.x++;
-				enemy[0].x++;
-				key.x++;
-				//treasure.x++;
-				for (int i = 0; i < NUM_WALLS_ACROSS; i++){
-					walls_across[i].x++;
-				}
-				for (int i = 0; i< NUM_WALLS_DOWN; i++){
-					walls_down[i].x++;
-				}
-			} else {
-				if (border_collision_movement(&player) == 0){
-					player.x--;
-				} else {
-					player.x++;
-				}
-			}
-			
-		} else
-		//RIGHT
-		if (BIT_IS_SET(PIND, 0)){
-			if (right.x + right.width > LCD_X  && player.x + round(PLAYERWIDTH / 2) + 1 == LCD_X / 2){
-				left.x--;
-				right.x--;
-				top.x--;
-				bottom.x--;
-				key.x--;
-				door.x--;
-				enemy[0].x--;
-				//treasure.x--;
-				for (int i = 0; i < NUM_WALLS_ACROSS; i++){
-					walls_across[i].x--;
-				}
-				for (int i = 0; i< NUM_WALLS_DOWN; i++){
-					walls_down[i].x--;
-				}
-			} else {
-				if (border_collision_movement(&player) == 0){
-					player.x++;
-				} else {
-					player.x--;
-				}
+				if (!border_wall_collision_movement(&player)){player.x++;} 
+				else {player.x -= 2;}
 			}
 		}	
 	}
@@ -710,35 +781,30 @@ void move_player(void){
 }
 
 void enemy_crawl(void){
+	if (num_enemies == 0) num_enemies = 1;
 
-	for (int i = 0; i < MAX_ENEMY_TREASURE; i++){
-		if (sprite_collision(&player, &enemy[0]) == 1){
-			lives--;
-
+	for (int i = 0; i < num_enemies; i++){
+		if (sprite_collision(&player, &enemy[i]) && shield_check == 0){
+			boolKey = 0;
 			do {
-				player.x = rand_between(0,84 - ENEMYWIDTH);
-				player.y = rand_between(0,48 - ENEMYHEIGHT);
-			}while(sprite_collision(&player,&tower) || sprite_collision(&player,&door) || 
-				  sprite_collision(&player,&left) || sprite_collision(&player,&right) ||
-				  sprite_collision(&player,&top) || sprite_collision(&player,&bottom) );
+				player.x = rand_between(0,LCD_X - PLAYERWIDTH - PLAYERWIDTH / 2);
+				player.y = rand_between(0,LCD_Y - PLAYERHEIGHT - PLAYERHEIGHT / 2);
+			}while(sprite_drop_collision(&player));
+			lives--;
+		} else if (sprite_collision(&player, &enemy[i]) && shield_check == 1){
+			shield_check = 0;
+			shield.x = -1000;
 
+			enemy[i].x = -1000;
 		}
-	}
 
-	if (enemy[0].x + 1 >= 0 && enemy[0].x + enemy[0].width <= LCD_X){
-		if (enemy[0].y + 1 >= 0 && enemy[0].y + enemy[0].height <= LCD_Y){
-			if (enemy[0].x < player.x){
-				enemy[0].x += 0.1;
-			} 
-			if (enemy[0].x > player.x){
-				enemy[0].x -= 0.1;
-			}
-			if (enemy[0].y < player.y){
-				enemy[0].y += 0.1;
-			}
-			if (enemy[0].y > player.y){
-				enemy[0].y -= 0.1;
-			}
+		if (((enemy[i].y > LCD_Y && enemy[i].y + enemy[i].height - 1 < 0) || 
+			(enemy[i].x < LCD_X && enemy[i].x + enemy[i].width - 1 > 0)) && 
+			!border_wall_collision_movement(&enemy[i])){
+			if (enemy[i].x < player.x)enemy[i].x += 0.1;
+			if (enemy[i].x > player.x)enemy[i].x -= 0.1;
+			if (enemy[i].y < player.y)enemy[i].y += 0.1;
+			if (enemy[i].y > player.y)enemy[i].y -= 0.1;		
 		}
 	}
 }
@@ -751,19 +817,22 @@ void enemy_crawl(void){
 
 \*-----------------------------------------------------------------------------------------------------*/
 
-uint8_t rand_number(void){
-	return (rand() % 10) + 1;
-}
-
-uint8_t rand_between(int min, int max){
-	return (rand() % max + 1 - min) + min;
+int rand_between(int mini, int max){
+	return rand() % (max + 1 - mini) + mini;
 }
 
 void create_scroll_border(void){
 	sprite_init(&left,-21 - VERWIDTH,-12 - HORHEIGHT,VERWIDTH,VERHEIGHT,verBitmaps);
-	sprite_init(&right,105 - VERWIDTH,-12 - HORHEIGHT,VERWIDTH,VERHEIGHT,verBitmaps);
-	sprite_init(&top,-21,-12 - HORHEIGHT,HORWIDTH, HORHEIGHT,horBitmaps);
-	sprite_init(&bottom,-21,76 - 12 + HORHEIGHT,HORWIDTH,HORHEIGHT,horBitmaps);
+	sprite_init(&right,126 - VERWIDTH,-12 - HORHEIGHT,VERWIDTH,VERHEIGHT,verBitmaps);
+	sprite_init(&top,-21,-12 - HORHEIGHT,180, HORHEIGHT,horBitmaps);
+	sprite_init(&bottom,-21,64 + HORHEIGHT,180,HORHEIGHT,horBitmaps);
+}
+
+void reset_scroll_border(void){
+	left.x = -21 - VERWIDTH; 		left.y =-12 -HORHEIGHT;
+	right.x = 126 - VERWIDTH;		right.y = -12 -HORHEIGHT;
+	top.x = -21;					top.y = -12-HORHEIGHT;
+	bottom.x = -21;					bottom.y = 64 + HORHEIGHT;
 }
 
 void draw_scroll_border(void){
@@ -780,18 +849,10 @@ void sprites_init(void){
 	sprite_init(&player, round((LCD_X - PLAYERWIDTH) / 2), round((LCD_Y - PLAYERHEIGHT) / 2), PLAYERWIDTH, PLAYERHEIGHT, playerBitmaps);
 
 	//RANDOM GENERATION OF SPRITES (e.g Monsters, Treasure)
-	for (int i = 0; i < MAX_ENEMY_TREASURE; i++){		
-		sprite_init(&enemy[i], -1000, 0, ENEMYWIDTH, ENEMYHEIGHT, enemyBitmaps);	
-	}
-	for (int i = 0; i < MAX_ENEMY_TREASURE; i++){
-		sprite_init(&treasure[i],-1000, 0,TREASUREWIDTH, TREASUREHEIGHT, treasureBitmaps);
-	}
+	for (int i = 0; i < MAX_ENEMY_TREASURE; i++){sprite_init(&enemy[i], -1000, 0, ENEMYWIDTH, ENEMYHEIGHT, enemyBitmaps);}
+	for (int i = 0; i < MAX_ENEMY_TREASURE; i++){sprite_init(&treasure[i],-1000, 0,TREASUREWIDTH, TREASUREHEIGHT, treasureBitmaps);}
 
 	//GROUND AND LEVEL 1 SPRITES
-//	sprite_init(&tower, 5.5, -12, TOWERWIDTH, TOWERHEIGHT, towerBitmaps);
-//	sprite_init(&door, (TOWERWIDTH + 1) / 2, TOWERHEIGHT - DOORHEIGHT - 12, DOORWIDTH, DOORHEIGHT, doorBitmaps);
-//	sprite_init(&enemy[0], 90, -3, ENEMYWIDTH, ENEMYHEIGHT, enemyBitmaps);
-//	sprite_init(&key, -6, -3, KEYWIDTH, KEYHEIGHT, keyBitmaps);
 
 	sprite_init(&tower, -1000, 0, TOWERWIDTH, TOWERHEIGHT, towerBitmaps);
 	sprite_init(&door, -1000, 0, DOORWIDTH, DOORHEIGHT, doorBitmaps);
@@ -799,41 +860,38 @@ void sprites_init(void){
 
 	//WALLS PAST LEVEL 1
 	//WALLS GOING HORIZONTALLY
-	for(int i = 0; i < NUM_WALLS_ACROSS;i++){
-		sprite_init(&walls_across[i],-1000, 0 ,44,HORHEIGHT,horBitmaps);
-	}
+	sprite_init(&walls_across[0],-1000, 0 ,ACROSSWIDTH,HORHEIGHT,horBitmaps);
+	sprite_init(&walls_across[1],-1000, 0 ,ACROSSWIDTH,HORHEIGHT,horBitmaps);
+	sprite_init(&walls_across[2],-1000, 0 ,ACROSSWIDTH,HORHEIGHT,horBitmaps);
+
 	//WALLS GOING VERTICALLY
-	for (int i = 0; i <NUM_WALLS_DOWN; i++){
-		sprite_init(&walls_down[i],-1000, 0 ,VERHEIGHT,27,verBitmaps);
-	}
+	sprite_init(&walls_down[0],-1000, 0 ,VERWIDTH,DOWNHEIGHT,verBitmaps);
+	sprite_init(&walls_down[1],-1000, 0 ,VERWIDTH,DOWNHEIGHT,verBitmaps);
+	sprite_init(&walls_down[2],-1000, 0 ,VERWIDTH,DOWNHEIGHT,verBitmaps);
 
 	//DOOR INIT
-	for (int i = 0; i < 4; i++){
-		sprite_init(&doors[i], -1000, 0, DOORWIDTH, DOORHEIGHT, doorBitmaps);
-	}
+	for (int i = 0; i < 4; i++){sprite_init(&doors[i], -1000, 0, DOORWIDTH, DOORHEIGHT, doorBitmaps);}
+
+	//DEFENCE ITEMS INIT
+	sprite_init(&shield, -1000, 0, SHIELDWIDTH, SHIELDHEIGHT, shieldBitmaps);
+	sprite_init(&bomb, -1000, 0, BOMBWIDTH, BOMBHEIGHT, bombBitmaps);
+	sprite_init(&bow, -1000, 0, BOWWIDTH, BOWHEIGHT, bowBitmaps);
 
 	//DOOR POSSIBLE LOCATIONS
-	doors[0].x = -16; 				doors[0].y = -10;
-	doors[1].x = -16; 				doors[1].y = 60 - DOORHEIGHT;
-	doors[2].x = 102 - DOORWIDTH;	doors[2].y = -10;
-	doors[3].x = 102 - DOORWIDTH;	doors[3].y = 60 - DOORHEIGHT;
+	doors[0].x = left.x + VERWIDTH + 2; 		doors[0].y = top.y + HORHEIGHT + 2;
+	doors[1].x = left.x + VERWIDTH + 2;			doors[1].y = bottom.y - DOORHEIGHT - 2;
+	doors[2].x = right.x - DOORWIDTH - 1;		doors[2].y = top.y + HORHEIGHT + 2;
+	doors[3].x = right.x - DOORWIDTH - 1;		doors[3].y = bottom.y - DOORHEIGHT - 2;
 }
 
-void place_sprites(int level){
-	sprites_init();
-
-	if (level == 0){
+void place_sprites(int lvl){
+	reset_scroll_border();
+	if (lvl == 0){
 		tower.x = 5.5; 					tower.y = -15;
 		door.x = (TOWERWIDTH + 1) / 2; 	door.y = TOWERHEIGHT - DOORHEIGHT - 15;
 		enemy[0].x = 90;				enemy[0].y = -3;
 		key.x = -9;						key.y = -5;
-	}
-	if (level == 1){
-		random_level_generator(1);
-	}
-	if (level >= 2){
-		random_level_generator(2);
-	}
+	}else {random_level_generator(); tower.x = -1000;}
 }
 
 void draw_level(int lvl){
@@ -843,13 +901,7 @@ void draw_level(int lvl){
 		sprite_draw(&door);
 		sprite_draw(&enemy[0]);
 		sprite_draw(&key);
-	}
-	if (lvl == 1){
-		random_level_drawer(1);		
-	}
-	if (lvl >= 2){
-		random_level_drawer(1);
-	}
+	} else {random_level_drawer();}
 }
 
 void draw_in_border(void){
@@ -867,40 +919,124 @@ void draw_in_border(void){
 	}
 }
 
-void random_level_generator(int levels){
-	if (levels == 1){
-		door = doors[rand_between(0,4) - 1];
+void random_level_generator(void){
+
+	int max_left = left.x + left.width + 2 + DOORWIDTH + 2,
+		max_right = right.x - 2 - DOORWIDTH - 2,
+		max_bottom = bottom.y - 2 - DOORHEIGHT - 2;
+
+	int rng;
+
+	rng = rand_between(0,4);
+
+	walls_down[0].x = rand_between(max_left, max_right);
+
+	walls_down[0].y = top.y + top.height; 
+	if (walls_down[0].x <= max_left + ACROSSWIDTH){
+		walls_across[0].x = walls_down[0].x + walls_down[0].width;
+	} else if (walls_down[0].x >= max_right - ACROSSWIDTH) {
+		walls_across[0].x = walls_down[0].x - walls_across[0].width + 2;
+	} else {
+		walls_across[0].x = walls_down[0].x + walls_down[0].width;
+	}
+	walls_across[0].y = walls_down[0].y + walls_down[0].height - (walls_down[0].width * 2);
+
+	walls_down[1].x = rand_between(max_left, max_right);
+	walls_down[1].y = bottom.y - walls_down[0].height;
+	if (walls_down[1].x <= max_left + ACROSSWIDTH){
+		walls_across[1].x = walls_down[1].x + walls_down[1].width;
+	} else if (walls_down[1].x >= max_right - ACROSSWIDTH) {
+		walls_across[1].x = walls_down[1].x - walls_across[1].width + 2;
+	} else {
+		walls_across[1].x = walls_down[1].x - walls_across[1].width + 2;
+	}
+
+	walls_across[1].y = rand_between(bottom.y - 76*.35 + walls_across[1].height, max_bottom);
+
+	if (walls_across[0].x >= LCD_X / 2){
+		walls_down[2].x = max_left;
+	} else {
+		walls_down[2].x = max_right - walls_down[2].width;
+	}
+	walls_down[2].y = top.y + top.height;
+
+	walls_across[2].width = 126 * .25;
+	if (walls_across[1].x >= LCD_X / 2){
+		walls_across[2].x = left.x + left.width;
+	} else {
+		walls_across[2].x = right.x - walls_across[2].width + 2;
+	}
+	walls_across[2].y = max_bottom - walls_across[2].height;
+
+	door = doors[rand_between(0,3)];
+	
+	do {
 		key.x = rand_between(-18, 102 - KEYWIDTH);
 		key.y = rand_between(-11, 59 - KEYHEIGHT);
-		enemy[0].x = rand_between(-18, 102 - ENEMYWIDTH);
-		enemy[0].y = rand_between(-11, 59 - ENEMYHEIGHT);
-		treasure[0].x = rand_between(-18, 102 - TREASUREWIDTH);
-		treasure[0].y = rand_between(-11, 59 - ENEMYHEIGHT);
+	} while(sprite_drop_collision(&key));
 
+	bow_likelihood = rand_between(0,10);
+	bomb_likelihood = rand_between(0,10);
+	shield_likelihood = rand_between(0,10);
+
+	if (bow_likelihood <= 3){
+		do {
+			bow.x = rand_between(left.x + left.width, right.x);
+			bow.y = rand_between(top.y + top.height, bottom.y - BOWHEIGHT);
+		} while (sprite_drop_collision(&bow));
 	}
-	if (levels == 2){
-		door = doors[rand_between(0,4) - 1];
+
+	if (bomb_likelihood <= 3){
+		do {
+			bomb.x = rand_between(left.x + left.width, right.x);
+			bomb.y = rand_between(top.y + top.height, bottom.y - BOMBHEIGHT);
+		} while (sprite_drop_collision(&bomb));
+	}
+	if (shield_likelihood <= 3){
+		do {
+			shield.x = rand_between(left.x + left.width, right.x);
+			shield.y = rand_between(top.y + top.height, bottom.y - SHIELDHEIGHT);
+		} while (sprite_drop_collision(&shield));
+	}
+
+	num_enemies = rand_between(1,5);
+	num_treasures = rand_between(0,5);
+
+	for (int i = 0; i < num_enemies;i++){
+		do{
+			enemy[i].x = rand_between(-21,106);
+			enemy[i].y = rand_between(-12,65);
+		} while (sprite_drop_collision(&enemy[i]));
+	}
+
+	for (int i = 0; i < num_treasures;i++){
+		do{
+			treasure[i].x = rand_between(-21,105);
+			treasure[i].y = rand_between(-12,65);
+		} while (sprite_drop_collision(&treasure[i]));
 	}
 }
 
-void random_level_drawer(int levels){
+void random_level_drawer(void){
 
-	if (levels == 1){
-		sprite_draw(&door);
-		sprite_draw(&key);
-		sprite_draw(&enemy[0]);
-		sprite_draw(&treasure[0]);
+	sprite_draw(&door);
+	sprite_draw(&key);
+
+	for (int i = 0; i < NUM_WALLS_DOWN; i++){sprite_draw(&walls_down[i]);}
+	for (int i = 0; i < NUM_WALLS_ACROSS; i++){sprite_draw(&walls_across[i]);}
+
+	for (int i = 0; i < num_treasures;i++){sprite_draw(&treasure[i]);}
+
+	for (int i = 0; i < num_enemies;i++){sprite_draw(&enemy[i]);}
+
+	if (bow_likelihood <= 3){
+		sprite_draw(&bow);
 	}
-	if (levels >= 2){
-		for (int i = 0; i < NUM_WALLS_DOWN; i++){
-			sprite_draw(&walls_down[i]);
-		}
-		for (int i = 0; i < NUM_WALLS_ACROSS; i++){
-			sprite_draw(&walls_across[i]);
-		}
-		
-		sprite_draw(&door);
-		sprite_draw(&enemy[0]);
+	if (bomb_likelihood <= 3){
+		sprite_draw(&bomb);
+	}
+	if (shield_likelihood <= 3){
+		sprite_draw(&shield);
 	}
 }
 
@@ -910,32 +1046,29 @@ void random_level_drawer(int levels){
 										 
 \*-----------------------------------------------------------------------------------------------------*/
 
-void get_screen_numbers(int scr, int floor, int live){
-	sprintf(score_msg, "Score: %d ", scr);
-	sprintf(flr_msg, "Floor: %d ", floor);
-	sprintf(liv_msg, "Lives: %d", live);
-}
-
 void show_load_screen(void){
+	sprintf(score_msg, "Score: %0d", score);
+	sprintf(flr_msg, "Floor: %d", flr);
+	sprintf(liv_msg, "Lives: %d", lives);
 	clear_screen();
 	draw_string(19, 3, "LOADING ...", FG_COLOUR);
 	draw_string(20, LCD_Y / 3 + 2, flr_msg, FG_COLOUR);
 	draw_string(20,LCD_Y / 3 * 2 + 2, score_msg, FG_COLOUR);
 	show_screen();
-
-	_delay_ms(1000);
-	boolKey = 0;
-
-	loading = 0;
+	_delay_ms(2000);
 }
 
-void draw_double(uint8_t x, uint8_t y, double seconds, double minutes, colour_t colour){
+void draw_double(int x, int y, double seconds, double minutes, colour_t colour){
     snprintf(buffer, sizeof(buffer), "Time: %02.0f:%02.0f", minutes, seconds);
     draw_string(x, y, buffer, colour);
 }
 
 int pause_status(double min, double sec){
+
 	if (BIT_IS_SET(PINB, 0)){
+		/*sprintf(score_msg, "Score: %i", score);
+		sprintf(flr_msg, "Floor: %i", flr);
+		sprintf(liv_msg, "Lives: %i", lives);*/
 
 		clear_screen();
 
@@ -1003,19 +1136,17 @@ void start_screen(void){
 	show_screen();
 }
 
-void game_over(int lives, int flr, int score){
+void game_over(void){
+
+	sprintf(score_msg, "Score: %i", score);
+	sprintf(flr_msg, "Floor: %i", flr);
 
 	clear_screen();
 
-	sprintf(score_msg, "Score: %d", score);
-	sprintf(flr_msg, "Floor: %d", flr);
-	sprintf(liv_msg, "Lives: %d", lives);
-
 	draw_string(19, 3, "GAME OVER", FG_COLOUR);
 	draw_string(20, LCD_Y / 5 + 2, score_msg, FG_COLOUR);
-	draw_string(20,LCD_Y / 5 * 2 + 2, flr_msg, FG_COLOUR);
-	draw_string(20,LCD_Y / 5 * 3 + 2, liv_msg, FG_COLOUR);
-	draw_string(22,LCD_Y / 5 * 4 + 1, "restart", BG_COLOUR);
+	draw_string(20,LCD_Y / 4 * 2 + 2, flr_msg, FG_COLOUR);
+	draw_string(22,LCD_Y / 4 * 3 + 1, "Restart", BG_COLOUR);
 
 	LCD_CMD(lcd_set_display_mode, lcd_display_inverse);
 	show_screen();
